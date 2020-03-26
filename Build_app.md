@@ -1,7 +1,6 @@
 # tkinterでアプリ作成 
-打ち抜き箇所抽出アプリを作成した際のログを残す。tkinterというパッケージを利用してアプリ自体を作成。
+打ち抜き箇所抽出アプリを作成した際のログ。tkinterというパッケージを利用してアプリ自体を作成。
  
-
 ## 1. 環境設定
 自分のローカルPCで作成した環境で操作する。 
 ```
@@ -25,7 +24,7 @@ ImportError: dlopen(/var/folders/lj/x6k9qjtn5rn77ztp7ttlj46c0000gn/T/_MEIxZRfvC/
   Referenced from: /private/var/folders/lj/x6k9qjtn5rn77ztp7ttlj46c0000gn/T/_MEIxZRfvC/libfreetype.6.dylib
   Reason: Incompatible library version: libfreetype.6.dylib requires version 54.0.0 or later, but libpng16.16.dylib provides version 38.0.0
 ```
-というエラーが出てしまうので，`opencv`はバージョン3を指定してインストールする必要がある。
+というエラーが出てしまうので，`opencv`はバージョン3を指定してインストールする必要があった。
 
 ## 2. tkinter
 ```
@@ -67,35 +66,70 @@ a = Analysis(['ExtPointer.py'],
 ```
 pip install tornado
 ```
+同様にコンソールから動かすと起動できるが，アプリアイコンから起動するのはすぐ落ちてしまう。何故なのか。。
 
-## 4. 環境 
+#### 2.3.2. 環境 
 ```
 331 INFO: PyInstaller: 3.6
 331 INFO: Python: 3.7.6 (conda)
 ```
 
-https://techracho.bpsinc.jp/yosuke2/2019_07_31/78252
-https://github.com/pyinstaller/pyinstaller/issues/4629
-https://forest.watch.impress.co.jp/docs/news/1226601.html
+## 5. エラー 
+おそらく，macのアプリを起動する際に，公証を受けているなどの認証が必要であることが原因のようである。以下の記事を参考にすること。
+[https://techracho.bpsinc.jp/yosuke2/2019_07_31/78252]
+[https://github.com/pyinstaller/pyinstaller/issues/4629]
+[https://forest.watch.impress.co.jp/docs/news/1226601.html]
 
 
-コンソールのエラー
+コンソールアプリからエラーを確認してみた。主に現れていたのは以下のようなエラー
 
 ```
 CGBitmapContextCreateImage: invalid context 0x0. If you want to see the backtrace, please set CG_CONTEXT_SHOW_BACKTRACE environmental variable.
-```
+``` 
 
-
-
-```
+``` 
 FAIL: PID[4856]: SecTaskCopySigningIdentifier(): [22: Invalid argument]
 ```
 
 ```
 Death (BackgroundOnly) of untracked active application: <private>
-```
+``` 
 
 ```
 Failed to copy signing info for 4794, responsible for file:///Users/wagatsuma/Documents/test_extract/dist/ExtPointer.app/Contents/MacOS/ExtPointer: #-67062: Error Domain=NSOSStatusErrorDomain Code=-67062 "(null)"
 ```
-Error Domain=NSOSStatusErrorDomain Code=-67062
+
+## 6. バイナリファイルに署名する　
+macの`名前なんだっけ`を突破するために，署名を行う。[この記事](https://qiita.com/zeriyoshi/items/78b4c7227217e2eac536)を参考にコード署名用の証明書を作成しする。
+
+```
+codesign --force --verify --verbose --sign "extract_position_apps" "ExtPointer.app" --deep --options runtime --timestamp
+``` 
+結果の出力が 
+```
+ExtPointer.app: signed app bundle with Mach-O thin (x86_64) [ExtPointer]
+``` 
+
+以下のコマンドで署名を確認すると，
+```
+codesign -vvv --deep --strict ./dist/ExtPointer.app
+```
+上記署名前の出力が以下のものから，
+```
+./dist/ExtPointer.app: code object is not signed at all
+```
+このように変化した。
+```
+./dist/ExtPointer.app: valid on disk
+./dist/ExtPointer.app: satisfies its Designated Requirement
+```
+
+ただ，結果的にダウンしてしまった。コンソールから起動した場合も動かなくなってしまい下記のエラー 
+```
+[11300] Error loading Python lib '/var/folders/lj/x6k9qjtn5rn77ztp7ttlj46c0000gn/T/_MEIzXzJl6/libpython3.7.dylib': dlopen: dlopen(/var/folders/lj/x6k9qjtn5rn77ztp7ttlj46c0000gn/T/_MEIzXzJl6/libpython3.7.dylib, 10): no suitable image found.  Did find:
+	/var/folders/lj/x6k9qjtn5rn77ztp7ttlj46c0000gn/T/_MEIzXzJl6/libpython3.7.dylib: code signature in (/var/folders/lj/x6k9qjtn5rn77ztp7ttlj46c0000gn/T/_MEIzXzJl6/libpython3.7.dylib) not valid for use in process using Library Validation: mapped file has no cdhash, completely unsigned? Code has to be at least ad-hoc signed.
+	/var/folders/lj/x6k9qjtn5rn77ztp7ttlj46c0000gn/T/_MEIzXzJl6/libpython3.7.dylib: stat() failed with errno=3
+  ``` 
+
+## USBで共有　
+USBでアプリファイルを共有し，`app/contents/macOS/`自体を起動することによって他のmacbookでも動作することは確認ずみ。
